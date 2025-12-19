@@ -1,0 +1,22 @@
+{
+    "id": "broker-etrade",
+    "name": "E*TRADE Broker",
+    "version": "0.1.0",
+    "description": "E*TRADE (Morgan Stanley) broker integration plugin.",
+    "type": "broker",
+    "permissions": [
+        "broker:read",
+        "broker:trade",
+        "secrets:read",
+        "network:https"
+    ],
+    "allowed_hosts": [
+        "api.etrade.com",
+        "apisb.etrade.com"
+    ],
+    "core": {
+        "min": "0.1.0"
+    },
+    "entry_point": "broker_etrade.wasm",
+    "api_version": "0.3.0"
+}
