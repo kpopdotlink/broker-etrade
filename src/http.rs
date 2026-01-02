@@ -97,12 +97,14 @@ impl HttpClient {
     }
 
     pub fn header(mut self, key: &str, value: &str) -> Self {
-        self.default_headers.insert(key.to_string(), value.to_string());
+        self.default_headers
+            .insert(key.to_string(), value.to_string());
         self
     }
 
     pub fn set_header(&mut self, key: &str, value: &str) {
-        self.default_headers.insert(key.to_string(), value.to_string());
+        self.default_headers
+            .insert(key.to_string(), value.to_string());
     }
 
     fn build_url(&self, path: &str) -> String {

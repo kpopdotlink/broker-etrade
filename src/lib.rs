@@ -11,8 +11,11 @@
 //! - Production: https://api.etrade.com
 //! - Sandbox: https://apisb.etrade.com
 
-mod http;
+// Allow dead_code for structs/fields prepared for future API integration
+#![allow(dead_code)]
+
 mod etrade;
+mod http;
 
 use chrono::Utc;
 use std::collections::HashMap;
@@ -21,7 +24,7 @@ use std::sync::Mutex;
 
 use etrade::ETradeClient;
 use models::order::{Order, OrderStatus};
-use models::portfolio::{AccountBalance, AccountSummary, Position};
+use models::portfolio::{AccountBalance, AccountSummary};
 use plugin_api::{
     GetAccountsRequest, GetAccountsResponse, GetPositionsRequest, GetPositionsResponse,
     SubmitOrderRequest, SubmitOrderResponse,
@@ -65,7 +68,7 @@ pub extern "C" fn alloc(len: i32) -> i32 {
 pub extern "C" fn initialize(ptr: i32, len: i32) -> u64 {
     let config_json: serde_json::Value = parse_request(ptr, len);
 
-    let mut state = STATE.lock().unwrap();
+    let mut state = STATE.lock().unwrap_or_else(|e| e.into_inner());
 
     // Parse configuration from secrets
     let consumer_key = config_json
@@ -132,13 +135,15 @@ pub extern "C" fn initialize(ptr: i32, len: i32) -> u64 {
 pub extern "C" fn get_accounts(ptr: i32, len: i32) -> u64 {
     let _req: GetAccountsRequest = parse_request(ptr, len);
 
-    let state = STATE.lock().unwrap();
+    let state = STATE.lock().unwrap_or_else(|e| e.into_inner());
 
     let client = match state.client.as_ref() {
         Some(c) => c,
         None => {
             return serialize_response(&GetAccountsResponse {
-                accounts: vec![create_error_account("Plugin not initialized or OAuth not completed")],
+                accounts: vec![create_error_account(
+                    "Plugin not initialized or OAuth not completed",
+                )],
             });
         }
     };
@@ -162,7 +167,7 @@ pub extern "C" fn get_accounts(ptr: i32, len: i32) -> u64 {
 pub extern "C" fn get_positions(ptr: i32, len: i32) -> u64 {
     let req: GetPositionsRequest = parse_request(ptr, len);
 
-    let state = STATE.lock().unwrap();
+    let state = STATE.lock().unwrap_or_else(|e| e.into_inner());
 
     let client = match state.client.as_ref() {
         Some(c) => c,
@@ -187,7 +192,7 @@ pub extern "C" fn get_positions(ptr: i32, len: i32) -> u64 {
 #[no_mangle]
 pub extern "C" fn submit_order(ptr: i32, len: i32) -> u64 {
     let req: SubmitOrderRequest = parse_request(ptr, len);
-    let mut state = STATE.lock().unwrap();
+    let mut state = STATE.lock().unwrap_or_else(|e| e.into_inner());
 
     let client = match state.client.as_ref() {
         Some(c) => c,
@@ -269,7 +274,10 @@ fn create_error_order(req: &SubmitOrderRequest, error: &str) -> Order {
         filled_quantity: 0.0,
         extensions: Some({
             let mut map = HashMap::new();
-            map.insert("error".to_string(), serde_json::Value::String(error.to_string()));
+            map.insert(
+                "error".to_string(),
+                serde_json::Value::String(error.to_string()),
+            );
             map
         }),
         persona_id: req.order.persona_id.clone(),

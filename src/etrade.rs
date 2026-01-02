@@ -2,15 +2,15 @@
 //!
 //! Implements OAuth 1.0a authentication and E*TRADE API endpoints.
 
-use crate::http::{HttpMethod, HttpRequest, execute};
+use crate::http::{execute, HttpMethod, HttpRequest};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use chrono::Utc;
+use hmac::{Hmac, Mac};
 use models::order::{Order, OrderRequest, OrderSide, OrderStatus, OrderType};
 use models::portfolio::{AccountBalance, AccountSummary, Position};
 use serde::Deserialize;
-use std::collections::HashMap;
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-use hmac::{Hmac, Mac};
 use sha1::Sha1;
+use std::collections::HashMap;
 
 type HmacSha1 = Hmac<Sha1>;
 
@@ -39,7 +39,12 @@ impl ETradeClient {
             consumer_secret,
             oauth_token,
             oauth_token_secret,
-            base_url: if is_sandbox { SANDBOX_URL } else { PRODUCTION_URL }.to_string(),
+            base_url: if is_sandbox {
+                SANDBOX_URL
+            } else {
+                PRODUCTION_URL
+            }
+            .to_string(),
             is_sandbox,
         }
     }
@@ -94,7 +99,10 @@ impl ETradeClient {
         let mut oauth_params = vec![
             ("oauth_consumer_key".to_string(), self.consumer_key.clone()),
             ("oauth_token".to_string(), self.oauth_token.clone()),
-            ("oauth_signature_method".to_string(), "HMAC-SHA1".to_string()),
+            (
+                "oauth_signature_method".to_string(),
+                "HMAC-SHA1".to_string(),
+            ),
             ("oauth_timestamp".to_string(), timestamp),
             ("oauth_nonce".to_string(), nonce),
             ("oauth_version".to_string(), "1.0".to_string()),
@@ -152,8 +160,7 @@ impl ETradeClient {
         headers.insert("Accept".to_string(), "application/json".to_string());
         headers.insert("Content-Type".to_string(), "application/json".to_string());
 
-        let body_str = serde_json::to_string(body)
-            .map_err(|e| e.to_string())?;
+        let body_str = serde_json::to_string(body).map_err(|e| e.to_string())?;
 
         let response = execute(HttpRequest {
             method: HttpMethod::Post,
@@ -212,7 +219,9 @@ impl ETradeClient {
 
             accounts.push(AccountSummary {
                 id: acct.account_id.clone(),
-                name: acct.account_name.unwrap_or_else(|| format!("E*TRADE {}", acct.account_id)),
+                name: acct
+                    .account_name
+                    .unwrap_or_else(|| format!("E*TRADE {}", acct.account_id)),
                 broker_id: "broker-etrade".to_string(),
                 is_paper: self.is_sandbox,
                 balance,
@@ -220,8 +229,10 @@ impl ETradeClient {
                 updated_at: Utc::now(),
                 extensions: Some({
                     let mut map = HashMap::new();
-                    map.insert("account_id_key".to_string(),
-                        serde_json::Value::String(acct.account_id_key));
+                    map.insert(
+                        "account_id_key".to_string(),
+                        serde_json::Value::String(acct.account_id_key),
+                    );
                     map
                 }),
             });
@@ -230,7 +241,10 @@ impl ETradeClient {
         Ok(accounts)
     }
 
-    fn get_account_details(&self, account_id_key: &str) -> Result<(AccountBalance, Vec<Position>), String> {
+    fn get_account_details(
+        &self,
+        account_id_key: &str,
+    ) -> Result<(AccountBalance, Vec<Position>), String> {
         #[derive(Deserialize)]
         struct BalanceResponse {
             #[serde(rename = "BalanceResponse")]
@@ -259,16 +273,21 @@ impl ETradeClient {
             total_long_value: Option<f64>,
         }
 
-        let path = format!("/v1/accounts/{}/balance?instType=BROKERAGE&realTimeNAV=true", account_id_key);
+        let path = format!(
+            "/v1/accounts/{}/balance?instType=BROKERAGE&realTimeNAV=true",
+            account_id_key
+        );
 
         let balance = match self.api_get::<BalanceResponse>(&path) {
             Ok(resp) => {
-                let rt = resp.response.computed
-                    .and_then(|c| c.real_time);
+                let rt = resp.response.computed.and_then(|c| c.real_time);
 
                 AccountBalance {
                     currency: "USD".to_string(),
-                    total_equity: rt.as_ref().and_then(|r| r.total_account_value).unwrap_or(0.0),
+                    total_equity: rt
+                        .as_ref()
+                        .and_then(|r| r.total_account_value)
+                        .unwrap_or(0.0),
                     available_cash: rt.as_ref().and_then(|r| r.net_mv).unwrap_or(0.0),
                     buying_power: rt.as_ref().and_then(|r| r.total_long_value).unwrap_or(0.0),
                     locked_cash: 0.0,
@@ -280,7 +299,7 @@ impl ETradeClient {
                 available_cash: 0.0,
                 buying_power: 0.0,
                 locked_cash: 0.0,
-            }
+            },
         };
 
         // Get positions
@@ -347,7 +366,8 @@ impl ETradeClient {
                 for portfolio in portfolios {
                     if let Some(pos_list) = portfolio.position {
                         for pos in pos_list {
-                            let current_price = pos.quick
+                            let current_price = pos
+                                .quick
                                 .and_then(|q| q.last_trade)
                                 .or(pos.cost_per_share)
                                 .unwrap_or(0.0);
@@ -480,7 +500,9 @@ impl ETradeClient {
         let path = format!("/v1/accounts/{}/orders/place", account_id);
         let resp: PlaceOrderResponse = self.api_post(&path, &req)?;
 
-        let order_id = resp.response.order_ids
+        let order_id = resp
+            .response
+            .order_ids
             .and_then(|ids| ids.first().map(|o| o.order_id.to_string()))
             .unwrap_or_else(|| client_order_id.clone());
 
@@ -494,8 +516,10 @@ impl ETradeClient {
             average_filled_price: None,
             extensions: Some({
                 let mut map = HashMap::new();
-                map.insert("client_order_id".to_string(),
-                    serde_json::Value::String(client_order_id));
+                map.insert(
+                    "client_order_id".to_string(),
+                    serde_json::Value::String(client_order_id),
+                );
                 map
             }),
             persona_id: order.persona_id.clone(),

@@ -7,7 +7,6 @@
     "permissions": [
         "broker:read",
         "broker:trade",
-        "secrets:read",
         "network:https"
     ],
     "allowed_hosts": [
@@ -17,6 +16,6 @@
     "core": {
         "min": "0.1.0"
     },
-    "entry_point": "broker_etrade.wasm",
+    "entry_point": "plugin.wasm",
     "api_version": "0.3.0"
 }

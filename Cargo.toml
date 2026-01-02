@@ -1,9 +1,10 @@
 [package]
 name = "broker-etrade"
-version = "0.1.0"
+version = "0.8.8"
 edition = "2021"
 description = "E*TRADE (Morgan Stanley) broker plugin for KL Investment"
 
+# Independent workspace for WASM-only build
 [workspace]
 
 [lib]
